@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Misi Arkib Warisan: Peribahasa Masyarakat (Prototaip)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- NippleJS untuk Virtual Joystick -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        /* Zona Touch Screen untuk Kamera (Kawasan Kanan) */
+        #touch-camera-zone {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
+            z-index: 5;
+            touch-action: none;
+        }
+        /* Virtual Joystick Container (Kawasan Kiri) */
+        #joystick-container {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 130px;
+            height: 130px;
+            z-index: 10;
+        }
+        /* Butang Interaksi Telefon */
+        #mobile-interact-btn {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            z-index: 10;
+        }
+        /* Glow Effect untuk UI */
+        .glow-text {
+            text-shadow: 0 0 10px rgba(234, 179, 8, 0.7);
+        }
+    </style>
+</head>
+<body class="relative text-white select-none">
+
+    <!-- 3D Canvas Viewport -->
+    <div id="canvas-container"></div>
+
+    <!-- Zona Touch Kamera untuk Peranti Skrin Sentuh -->
+    <div id="touch-camera-zone"></div>
+
+    <!-- Virtual Joystick Zone -->
+    <div id="joystick-container"></div>
+
+    <!-- Overlay UI Utama -->
+    <div id="ui-overlay" class="absolute top-0 left-0 w-full h-full pointer-events-none z-10 flex flex-col justify-between p-4 md:p-6">
+        
+        <!-- Header Tajuk & Status -->
+        <div class="flex justify-between items-start w-full">
+            <div class="bg-slate-900/80 backdrop-blur-md p-3 md:p-4 rounded-xl border border-amber-600/50 shadow-lg max-w-xs md:max-w-md pointer-events-auto">
+                <h1 class="text-base md:text-xl font-bold text-amber-400 glow-text flex items-center gap-2">
+                    <span>🏛️</span> Misi Arkib Warisan
+                </h1>
+                <p class="text-xs md:text-sm text-slate-300 font-medium">Peribahasa Masyarakat (Prototaip)</p>
+                <div class="mt-2 text-[10px] md:text-xs bg-amber-950/60 text-amber-200 px-2 py-1 rounded border border-amber-800/40 inline-block">
+                    Peringkat 1: Ujian Pergerakan & Kamera
+                </div>
+            </div>
+
+            <!-- Panel Bantuan Kawalan (Desktop) -->
+        <div class="hidden md:block bg-slate-900/80 backdrop-blur-md p-3 rounded-xl border border-slate-700/60 text-xs text-slate-300 pointer-events-auto">
+            <p class="font-semibold text-amber-400 mb-1">🎮 Kawalan Komputer:</p>
+            <p>• <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-600 text-amber-300">W</kbd><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-600 text-amber-300">A</kbd><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-600 text-amber-300">S</kbd><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-600 text-amber-300">D</kbd> / Anak Panah : Bergerak</p>
+            <p>• Seret Tetikus : Pusing Kamera</p>
+            <p>• <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-600 text-amber-300">E</kbd> / Klik Objek : Interaksi</p>
+            <!-- Status Kunci Warisan -->
+            <div id="key-status" class="mt-2 pt-2 border-t border-slate-700 text-amber-300 font-bold flex flex-col gap-1">
+                <div>🔑 Kunci 1 (Kerjasama): <span id="key1-count-text" class="text-rose-400">Belum</span></div>
+                <div>🔑 Kunci 2 (Budi): <span id="key2-count-text" class="text-rose-400">Belum</span></div>
+                <div>🔑 Kunci 3 (Muafakat): <span id="key3-count-text" class="text-rose-400">Belum</span></div>
+            </div>
+            <!-- Butang Reset Kemajuan -->
+            <button id="reset-progress-btn" class="mt-2 text-[10px] bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800/50 px-2 py-1 rounded w-full transition-colors cursor-pointer">
+                🔄 Reset Kemajuan
+            </button>
+        </div>
+    </div>
+
+    <!-- Prompt Interaksi Objek -->
+    <div id="interaction-prompt" class="self-center bg-amber-500/90 text-slate-950 font-bold px-6 py-3 rounded-full shadow-2xl border-2 border-amber-300 animate-bounce transition-all duration-300 opacity-0 transform translate-y-4 pointer-events-none flex items-center gap-2 z-20">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        <span id="prompt-text">Tekan [E] atau Ketik Butang Interaksi</span>
+    </div>
+
+    <!-- Butang Interaksi Mudah Alih -->
+    <button id="mobile-interact-btn" class="hidden md:hidden bg-amber-500 active:bg-amber-600 text-slate-950 font-extrabold p-4 rounded-full shadow-xl border-2 border-amber-200 pointer-events-auto transition-transform transform active:scale-95 flex items-center justify-center">
+        <span class="text-sm">AKSI (E)</span>
+    </button>
+
+    <!-- Modal Dialog Misi Pembelajaran (Cabaran Peribahasa & Peti Glosari) -->
+    <div id="dialog-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-slate-900 border-2 border-amber-500/80 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative transform transition-transform scale-95 duration-300 id-dialog-box max-h-[90vh] overflow-y-auto">
+            
+            <!-- Header Dialog -->
+            <div class="flex items-center gap-3 border-b border-slate-800 pb-3 mb-4">
+                <div class="p-2 bg-amber-500/20 text-amber-400 rounded-lg border border-amber-500/30">
+                    🏛️
+                </div>
+                <div>
+                    <h3 id="modal-title" class="text-lg font-bold text-amber-400">Tugu Keharmonian: Cabaran 1</h3>
+                    <p id="modal-subtitle" class="text-xs text-slate-400">Topik: Peribahasa Kemasyarakatan (STPM)</p>
+                </div>
+            </div>
+
+            <!-- Kad Soalan Cabaran -->
+            <div id="quiz-container" class="space-y-4">
+                <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700">
+                    <p class="text-xs text-amber-400 font-semibold uppercase tracking-wider mb-1">Situasi / Soalan:</p>
+                    <p id="quiz-question" class="text-slate-100 text-sm md:text-base leading-relaxed">
+                        Penduduk Kampung Seri Damai sentiasa bekerjasama dan bantu-membantu dalam setiap majlis perkahwinan atau pembersihan kawasan kampung tanpa mengharapkan balasan. Apakah peribahasa yang paling sesuai bagi menggambarkan situasi ini?
+                    </p>
+                </div>
+
+                <!-- Pilihan Keyakinan -->
+                <div id="confidence-box" class="flex items-center gap-3 text-xs text-slate-300 bg-slate-950/40 p-2 rounded-lg border border-slate-800">
+                    <span class="font-semibold text-amber-300">Tahap Keyakinan:</span>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="confidence" value="Yakin" checked class="accent-amber-500"> Yakin
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="confidence" value="Agak-agak" class="accent-amber-500"> Agak-agak
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="confidence" value="Teka sahaja" class="accent-amber-500"> Teka sahaja
+                    </label>
+                </div>
+
+                <!-- Pilihan Jawapan -->
+                <div id="options-container" class="space-y-2">
+                    <!-- Dinamik mengikut soalan aktif -->
+                </div>
+
+                <!-- Kawasan Maklum Balas / Petunjuk -->
+                <div id="feedback-box" class="hidden p-4 rounded-xl text-sm border leading-relaxed"></div>
+            </div>
+
+            <!-- Kad Glosari Tambahan (Peti Harta Karun) -->
+            <div id="glossary-container" class="hidden space-y-4">
+                <div class="bg-amber-950/40 border border-amber-500/40 p-4 rounded-xl">
+                    <h4 id="glossary-title" class="text-base font-bold text-amber-400 flex items-center gap-2">📦 Peti Harta Glosari STPM</h4>
+                    <p id="glossary-content" class="text-xs text-slate-200 mt-2 leading-relaxed">Nota ringkas berkaitan peribahasa tambahan...</p>
+                </div>
+            </div>
+
+            <!-- Dashboard Ringkasan Misi (Skrin Tamat) -->
+            <div id="summary-container" class="hidden space-y-4">
+                <div class="bg-amber-950/40 border border-amber-500/40 p-4 rounded-xl text-center">
+                    <h4 class="text-lg font-bold text-amber-400">🎉 Misi Arkib Warisan Selesai!</h4>
+                    <p class="text-xs text-amber-200 mt-1">Anda telah berjaya mengumpul kesemua 3 Kunci Warisan dan menaiki Puncak Arkib Warisan.</p>
+                </div>
+
+                <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 text-xs text-slate-200 space-y-2">
+                    <p class="font-bold text-amber-300 border-b border-slate-700 pb-1">📊 Ringkasan Prestasi Pembelajaran:</p>
+                    <div class="flex justify-between">
+                        <span>Kunci Warisan Terkumpul:</span>
+                        <span id="summary-keys" class="font-bold text-emerald-400">3 / 3</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Jumlah Cubaan Menjawab:</span>
+                        <span id="summary-attempts" class="font-bold text-amber-300">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Jumlah Petunjuk Digunakan:</span>
+                        <span id="summary-hints" class="font-bold text-amber-300">0</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
+                    <p class="font-semibold text-slate-300">Pencapaian Hasil Pembelajaran (STPM):</p>
+                    <p class="text-emerald-400">✓ HP1: Memadankan peribahasa semangat kerjasama</p>
+                    <p class="text-emerald-400">✓ HP2: Memadankan peribahasa adab & kesusahan bersama</p>
+                    <p class="text-emerald-400">✓ HP3: Memadankan peribahasa musyawarah & muafakat</p>
+                </div>
+            </div>
+
+            <!-- Butang Tindakan / Tutup -->
+            <div class="mt-6 flex justify-end gap-3 border-t border-slate-800 pt-3">
+                <button id="hint-btn" class="bg-slate-800 hover:bg-slate-700 text-amber-300 font-medium px-4 py-2 rounded-xl text-xs border border-amber-500/30 transition-colors">
+                    💡 Petunjuk
+                </button>
+                <button id="close-dialog-btn" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-2 rounded-xl shadow-lg transition-colors text-sm">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. SETTING UTAMA & PEMBALIHAN ---
+        let scene, camera, renderer;
+        let player;
+        let interactObjects = []; // Senarai Objek Cabaran & Peti Harta
+        let currentActiveObject = null;
+        let clock = new THREE.Clock();
+
+        // Status Permainan & Kawalan
+        let isDialogOpen = false;
+        let canInteract = false;
+        let activeChallengeIndex = -1; // 0-2: Cabaran, 10-12: Peti Harta
+        let cameraYaw = 0;   
+        let cameraPitch = 0.2; 
+
+        // Tetapan Komputer & Papan Kekunci
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+        let isMouseDown = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        // Tetapan Kawalan Sentuh (Mobile)
+        let joystickManager = null;
+        let joystickVector = { x: 0, y: 0 };
+        let previousTouchPosition = { x: 0, y: 0 };
+
+        // Halangan (Walls) & Pintu Sekatan
+        const walls = [];
+        let gates = [null, null, null]; // Gate 1, Gate 2, Gate Utama
+        let gateBboxIndices = [-1, -1, -1];
+        const PLAYER_RADIUS = 0.6;
+        const PLAYER_SPEED = 6.0;
+
+        // Status Pembelajaran & Rekod Prestasi (localStorage)
+        let keysProgress = [false, false, false];
+        let totalAttempts = 0;
+        let hintsUsed = 0;
+
+        // Data 3 Cabaran Pembelajaran Peribahasa (STPM)
+        const challengesData = [
+            {
+                id: 1,
+                name: "Tugu Keharmonian",
+                topic: "HP1: Semangat Kerjasama & Bergotong-Royong",
+                question: "Penduduk Kampung Seri Damai sentiasa bekerjasama dan bantu-membantu dalam setiap majlis perkahwinan atau pembersihan kawasan kampung tanpa mengharapkan balasan. Apakah peribahasa yang paling sesuai?",
+                options: [
+                    "A. Bagaikan aur dengan tebing",
+                    "B. Seperti enau dalam belukar, melepaskan pucuk masing-masing",
+                    "C. Bagaikan anjing dengan kucing"
+                ],
+                correctIndex: 0,
+                hint: "Cari peribahasa yang menggunakan kiasan unsur alam yang saling memerlukan antara tumbuhan dan tebing sungai untuk kekal kukuh.",
+                explanation: "Peribahasa 'Bagaikan aur dengan tebing' bermaksud hubungan yang sangat rapat dan saling membantu antara satu sama lain dalam masyarakat."
+            },
+            {
+                id: 2,
+                name: "Prasasti Budi",
+                topic: "HP2: Adab & Sikap Sama-sama Menanggung Kesusahan",
+                question: "Apabila berdepan dengan ujian kemelesetan ekonomi, ahli persatuan penduduk bersetuju untuk mengurangkan beban golongan tidak berkemampuan dengan mengumpul dana bantuan bersama-sama. Peribahasa manakah yang tepat?",
+                options: [
+                    "A. Ada gula ada semut",
+                    "B. Yang berat sama dipikul, yang ringan sama dijunjung",
+                    "C. Masuk kandang kambing mengembek, masuk kandang kerbau menguak"
+                ],
+                correctIndex: 1,
+                hint: "Cari peribahasa yang menggambarkan sikap kebersamaan dalam menghadapi perkara susah (berat) mahupun senang/mudah (ringan).",
+                explanation: "Peribahasa 'Yang berat sama dipikul, yang ringan sama dijunjung' bermaksud senasib dan bersama-sama menanggung susah dan senang."
+            },
+            {
+                id: 3,
+                name: "Batu Bersurat Muafakat",
+                topic: "HP3: Musyawarah & Muafakat Mencapai Kata Sepakat",
+                question: "Setiap keputusan penting berkaitan pembangunan surau kampung hanya akan dimuktamadkan selepas semua ahli kariah berbincang dan mencapai persetujuan bersama. Peribahasa manakah yang paling sesuai?",
+                options: [
+                    "A. Hati gajah sama dilapah, hati kuman sama dicecah",
+                    "B. Harimau mati meninggalkan belang, manusia mati meninggalkan nama",
+                    "C. Bulat air kerana pembuluh, bulat manusia kerana muafakat"
+                ],
+                correctIndex: 2,
+                hint: "Cari peribahasa yang mengaitkan kebulatan aliran air dalam buluh dengan kebulatan fikiran/kata sepakat manusia.",
+                explanation: "Peribahasa 'Bulat air kerana pembuluh, bulat manusia kerana muafakat' bermaksud kata sepakat yang dicapai melalui perbincangan atau musyawarah."
+            }
+        ];
+
+        // Data Peti Glosari Elemen Peringkat 4
+        const glossaryData = [
+            {
+                id: 10,
+                name: "Peti Harta Glosari 1",
+                topic: "Nota Tambahan: Agihan & Keadilan",
+                title: "Hati gajah sama dilapah, hati kuman sama dicecah",
+                desc: "Maksud: Pembahagian yang sama rata dan adil. Banyak atau sedikit sesuatu nikmat mahupun kesusahan itu dirasai dan dikongsi bersama secara saksama."
+            },
+            {
+                id: 11,
+                name: "Peti Harta Glosari 2",
+                topic: "Nota Tambahan: Kesenangan & Tumpuan",
+                title: "Ada gula ada semut",
+                desc: "Maksud: Di mana-mana sahaja terdapat rezeki, kesenangan, atau perniagaan yang maju, di situlah ramai orang akan berkumpul dan berhimpun."
+            },
+            {
+                id: 12,
+                name: "Peti Harta Glosari 3",
+                topic: "Nota Tambahan: Penyesuaian Adab",
+                title: "Masuk kandang kambing mengembek, masuk kandang kerbau menguak",
+                desc: "Maksud: Pandai menyesuaikan diri dengan adat dan budaya tempatan di mana-mana sahaja kita berada."
+            }
+        ];
+
+        // --- 2. INISIALISASI TIGA DIMENSI (THREE.JS) ---
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x12131C);
+            scene.fog = new THREE.FogExp2(0x12131C, 0.035);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Pencahayaan
+            setupLighting();
+
+            // Pembinaan Persekitaran (Lantai, Dinding & Puncak Arkib 3D)
+            createEnvironment();
+
+            // Pembinaan Watak
+            createPlayer();
+
+            // Pembinaan 3 Objek Cabaran Pembelajaran & Peti Glosari
+            createInteractableObjects();
+
+            // Semak kemajuan terdahulu dari localStorage
+            loadProgress();
+
+            // Tetapan Kawalan
+            setupControls();
+
+            // Resize Event Listener
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Animasi Loop
+            animate();
+        }
+
+        // --- 3. PENCAHAYAAN ---
+        function setupLighting() {
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfef08a, 0.85);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 100;
+            const d = 35;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            const fillLight = new THREE.DirectionalLight(0x3b82f6, 0.35);
+            fillLight.position.set(-20, 20, -20);
+            scene.add(fillLight);
+        }
+
+        // --- 4. PEMBINAAN PERSEKITARAN MAZE & PUNCAK ARKIB (PERINGKAT 4) ---
+        function createEnvironment() {
+            // Lantai Utama
+            const floorGeometry = new THREE.PlaneGeometry(70, 70);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x3a281c, 
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            const gridHelper = new THREE.GridHelper(70, 35, 0x8c6d53, 0x281a10);
+            gridHelper.position.y = 0.01;
+            scene.add(gridHelper);
+
+            // Bahan Dinding
+            const wallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x475569, 
+                roughness: 0.7,
+                metalness: 0.2
+            });
+
+            // Layout Maze 3 Sektor
+            const wallData = [
+                // Sempadan Luar
+                [0, -32, 64, 2],
+                [0, 32, 64, 2],
+                [-32, 0, 2, 64],
+                [32, 0, 2, 64],
+
+                // Sektor 1 Walls
+                [-10, -12, 2, 20],
+                [-10, 12, 16, 2],
+                [10, -12, 2, 20],
+
+                // Sektor 2 Walls
+                [-18, 0, 2, 24],
+                [18, 0, 2, 24],
+                [0, -12, 18, 2],
+
+                // Sektor 3 / Puncak Walls
+                [-12, -22, 2, 16],
+                [12, -22, 2, 16]
+            ];
+
+            const wallHeight = 4;
+
+            wallData.forEach(data => {
+                const geometry = new THREE.BoxGeometry(data[2], wallHeight, data[3]);
+                const wall = new THREE.Mesh(geometry, wallMaterial);
+                wall.position.set(data[0], wallHeight / 2, data[1]);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+
+                const bbox = new THREE.Box3().setFromObject(wall);
+                walls.push(bbox);
+            });
+
+            // ELEMEN PERINGKAT 4: Puncak Arkib (Pentas Aras Atas & Tangga)
+            const platformGeo = new THREE.BoxGeometry(20, 1.5, 10);
+            const platformMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.5 });
+            const platform = new THREE.Mesh(platformGeo, platformMat);
+            platform.position.set(0, 0.75, -27);
+            platform.receiveShadow = true;
+            platform.castShadow = true;
+            scene.add(platform);
+            walls.push(new THREE.Box3().setFromObject(platform));
+
+            // Tangga Puncak Arkib
+            for (let i = 0; i < 5; i++) {
+                const stepGeo = new THREE.BoxGeometry(6, 0.3, 0.8);
+                const stepMat = new THREE.MeshStandardMaterial({ color: 0xb45309 });
+                const step = new THREE.Mesh(stepGeo, stepMat);
+                step.position.set(0, 0.15 + i * 0.3, -21.5 + i * 0.7);
+                step.receiveShadow = true;
+                step.castShadow = true;
+                scene.add(step);
+            }
+
+            // Pembinaan 3 Pintu Sekatan Berkunci
+            const gateConfigs = [
+                { pos: [0, 2, 8], color: 0x991b1b, size: [8, 4, 0.8] },   // Gate 1 (Kunci 1)
+                { pos: [0, 2, -12], color: 0x075985, size: [8, 4, 0.8] }, // Gate 2 (Kunci 2)
+                { pos: [0, 2, -20], color: 0x854d0e, size: [10, 4, 0.8] } // Gate Utama (3 Kunci)
+            ];
+
+            gateConfigs.forEach((cfg, idx) => {
+                const gateGeo = new THREE.BoxGeometry(...cfg.size);
+                const gateMat = new THREE.MeshStandardMaterial({ color: cfg.color, roughness: 0.4 });
+                const gateMesh = new THREE.Mesh(gateGeo, gateMat);
+                gateMesh.position.set(...cfg.pos);
+                gateMesh.castShadow = true;
+                gateMesh.receiveShadow = true;
+                scene.add(gateMesh);
+
+                gates[idx] = gateMesh;
+
+                const gateBbox = new THREE.Box3().setFromObject(gateMesh);
+                walls.push(gateBbox);
+                gateBboxIndices[idx] = walls.length - 1;
+            });
+        }
+
+        // --- 5. PEMBINAAN WATAK ---
+        function createPlayer() {
+            player = new THREE.Group();
+
+            const bodyGeo = new THREE.BoxGeometry(0.8, 1.2, 0.6);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
+            const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+            bodyMesh.position.y = 0.8;
+            bodyMesh.castShadow = true;
+            player.add(bodyMesh);
+
+            const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.5 });
+            const headMesh = new THREE.Mesh(headGeo, headMat);
+            headMesh.position.y = 1.7;
+            headMesh.castShadow = true;
+            player.add(headMesh);
+
+            const visorGeo = new THREE.BoxGeometry(0.5, 0.2, 0.2);
+            const visorMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+            const visorMesh = new THREE.Mesh(visorGeo, visorMat);
+            visorMesh.position.set(0, 1.7, 0.28);
+            player.add(visorMesh);
+
+            player.position.set(0, 0, 24); // Mula di Sektor 1
+            scene.add(player);
+        }
+
+        // --- 6. PEMBINAAN OBJEK CABARAN & PETI GLOSARI (PERINGKAT 4) ---
+        function createInteractableObjects() {
+            // 3 Objek Cabaran Utama
+            const objectPositions = [
+                { pos: [0, 0, 16], color: 0xf59e0b, name: "Tugu Keharmonian", type: "quiz" },      
+                { pos: [-12, 0, -2], color: 0x38bdf8, name: "Prasasti Budi", type: "quiz" },        
+                { pos: [12, 0, -18], color: 0xa855f7, name: "Batu Bersurat Muafakat", type: "quiz" } 
+            ];
+
+            objectPositions.forEach((data, index) => {
+                const group = new THREE.Group();
+
+                const baseGeo = new THREE.BoxGeometry(1.6, 1.0, 1.6);
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+                const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+                baseMesh.position.y = 0.5;
+                baseMesh.castShadow = true;
+                baseMesh.receiveShadow = true;
+                group.add(baseMesh);
+
+                let shapeGeo;
+                if (index === 0) shapeGeo = new THREE.BoxGeometry(1.0, 1.0, 1.0);
+                else if (index === 1) shapeGeo = new THREE.OctahedronGeometry(0.7);
+                else shapeGeo = new THREE.DodecahedronGeometry(0.7);
+
+                const shapeMat = new THREE.MeshStandardMaterial({ 
+                    color: data.color, 
+                    emissive: data.color,
+                    emissiveIntensity: 0.5,
+                    roughness: 0.2
+                });
+                const shapeMesh = new THREE.Mesh(shapeGeo, shapeMat);
+                shapeMesh.position.y = 1.6;
+                shapeMesh.castShadow = true;
+                group.add(shapeMesh);
+
+                const ringGeo = new THREE.TorusGeometry(1.2, 0.05, 16, 32);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.rotation.x = Math.PI / 2;
+                ringMesh.position.y = 0.05;
+                group.add(ringMesh);
+
+                const pointLight = new THREE.PointLight(data.color, 1.5, 6);
+                pointLight.position.set(0, 2, 0);
+                group.add(pointLight);
+
+                group.position.set(...data.pos);
+                scene.add(group);
+
+                interactObjects.push({
+                    group: group,
+                    index: index,
+                    type: "quiz",
+                    shapeMesh: shapeMesh,
+                    ringMesh: ringMesh
+                });
+
+                walls.push(new THREE.Box3().setFromObject(baseMesh));
+            });
+
+            // ELEMEN PERINGKAT 4: 3 Peti Harta Karun Glosari Extra
+            const chestPositions = [
+                { pos: [14, 0, 16], index: 10, name: "Peti Harta Glosari 1" },
+                { pos: [14, 0, -2], index: 11, name: "Peti Harta Glosari 2" },
+                { pos: [-14, 0, -18], index: 12, name: "Peti Harta Glosari 3" }
+            ];
+
+            chestPositions.forEach(c => {
+                const chestGroup = new THREE.Group();
+
+                const boxGeo = new THREE.BoxGeometry(1.0, 0.7, 0.7);
+                const boxMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.4 });
+                const boxMesh = new THREE.Mesh(boxGeo, boxMat);
+                boxMesh.position.y = 0.35;
+                boxMesh.castShadow = true;
+                chestGroup.add(boxMesh);
+
+                const lidGeo = new THREE.BoxGeometry(1.05, 0.2, 0.75);
+                const lidMat = new THREE.MeshStandardMaterial({ color: 0x78350f });
+                const lidMesh = new THREE.Mesh(lidGeo, lidMat);
+                lidMesh.position.set(0, 0.75, 0);
+                chestGroup.add(lidMesh);
+
+                const glowLight = new THREE.PointLight(0xfef08a, 1.2, 4);
+                glowLight.position.set(0, 1, 0);
+                chestGroup.add(glowLight);
+
+                chestGroup.position.set(...c.pos);
+                scene.add(chestGroup);
+
+                interactObjects.push({
+                    group: chestGroup,
+                    index: c.index,
+                    type: "chest",
+                    shapeMesh: lidMesh,
+                    ringMesh: boxMesh
+                });
+
+                walls.push(new THREE.Box3().setFromObject(boxMesh));
+            });
+        }
+
+        // --- 7. KAWALAN & EVENT LISTENERS ---
+        function setupControls() {
+            window.addEventListener('keydown', (e) => {
+                if (keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.code)) {
+                    keys[e.key] = true;
+                }
+                if (e.key === 'e' || e.key === 'E') {
+                    triggerInteraction();
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.code)) {
+                    keys[e.key] = false;
+                }
+            });
+
+            window.addEventListener('mousedown', (e) => {
+                if (e.target.closest('#ui-overlay') || e.target.closest('#dialog-modal')) return;
+                isMouseDown = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('mouseup', () => isMouseDown = false);
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isMouseDown || isDialogOpen) return;
+
+                const deltaX = e.clientX - previousMousePosition.x;
+                const deltaY = e.clientY - previousMousePosition.y;
+
+                cameraYaw -= deltaX * 0.005;
+                cameraPitch += deltaY * 0.005;
+                cameraPitch = Math.max(-0.2, Math.min(1.1, cameraPitch));
+
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            const touchZone = document.getElementById('touch-camera-zone');
+            
+            touchZone.addEventListener('touchstart', (e) => {
+                if (isDialogOpen) return;
+                const touch = e.touches[0];
+                previousTouchPosition = { x: touch.clientX, y: touch.clientY };
+            }, { passive: true });
+
+            touchZone.addEventListener('touchmove', (e) => {
+                if (isDialogOpen) return;
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - previousTouchPosition.x;
+                const deltaY = touch.clientY - previousTouchPosition.y;
+
+                cameraYaw -= deltaX * 0.007;
+                cameraPitch += deltaY * 0.007;
+                cameraPitch = Math.max(-0.2, Math.min(1.1, cameraPitch));
+
+                previousTouchPosition = { x: touch.clientX, y: touch.clientY };
+            }, { passive: true });
+
+            const joystickContainer = document.getElementById('joystick-container');
+            joystickManager = nipplejs.create({
+                zone: joystickContainer,
+                mode: 'static',
+                position: { left: '65px', bottom: '65px' },
+                color: '#f59e0b',
+                size: 110
+            });
+
+            joystickManager.on('move', (evt, data) => {
+                if (data && data.vector) {
+                    joystickVector.x = data.vector.x;
+                    joystickVector.y = data.vector.y;
+                }
+            });
+
+            joystickManager.on('end', () => {
+                joystickVector.x = 0;
+                joystickVector.y = 0;
+            });
+
+            document.getElementById('mobile-interact-btn').addEventListener('click', triggerInteraction);
+            document.getElementById('close-dialog-btn').addEventListener('click', closeDialog);
+            document.getElementById('hint-btn').addEventListener('click', showHint);
+            document.getElementById('reset-progress-btn').addEventListener('click', resetProgress);
+        }
+
+        // --- 8. LOGIK SEMAKAN SOALAN & PEMBELAJARAN ---
+        function renderQuestionUI(idx) {
+            const data = challengesData[idx];
+            document.getElementById('modal-title').innerText = `${data.name}: Cabaran ${idx + 1}`;
+            document.getElementById('modal-subtitle').innerText = data.topic;
+            document.getElementById('quiz-question').innerText = data.question;
+
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+
+            data.options.forEach((optText, optIdx) => {
+                const btn = document.createElement('button');
+                btn.className = "option-btn w-full text-left p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm text-slate-200 transition-colors flex justify-between items-center cursor-pointer";
+                btn.setAttribute('data-index', optIdx);
+                btn.innerHTML = `<span>${optText}</span><span class="text-xs opacity-0 icon font-bold">✓</span>`;
+                
+                btn.addEventListener('click', () => checkQuizAnswer(optIdx));
+                
+                if (keysProgress[idx]) {
+                    btn.disabled = true;
+                }
+
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedbackBox = document.getElementById('feedback-box');
+            feedbackBox.classList.add('hidden');
+
+            if (keysProgress[idx]) {
+                feedbackBox.classList.remove('hidden', 'bg-rose-950/60', 'border-rose-500/50', 'text-rose-200');
+                feedbackBox.classList.add('bg-emerald-950/60', 'border-emerald-500/50', 'text-emerald-200');
+                feedbackBox.innerHTML = `
+                    <p class="font-bold text-emerald-400 mb-1">✓ Cabaran Ini Telah Selesai!</p>
+                    <p>${data.explanation}</p>
+                `;
+            }
+        }
+
+        function renderGlossaryUI(idx) {
+            const gData = glossaryData.find(g => g.id === idx);
+            if (!gData) return;
+
+            document.getElementById('modal-title').innerText = gData.name;
+            document.getElementById('modal-subtitle').innerText = gData.topic;
+            document.getElementById('glossary-title').innerText = `📦 ${gData.title}`;
+            document.getElementById('glossary-content').innerText = gData.desc;
+        }
+
+        function checkQuizAnswer(selectedIndex) {
+            if (activeChallengeIndex < 0 || activeChallengeIndex >= 3) return;
+
+            totalAttempts++;
+            const data = challengesData[activeChallengeIndex];
+            const feedbackBox = document.getElementById('feedback-box');
+            feedbackBox.classList.remove('hidden', 'bg-emerald-950/60', 'border-emerald-500/50', 'text-emerald-200', 'bg-rose-950/60', 'border-rose-500/50', 'text-rose-200', 'bg-amber-950/60', 'border-amber-500/50', 'text-amber-200');
+
+            if (selectedIndex === data.correctIndex) {
+                keysProgress[activeChallengeIndex] = true;
+                saveProgress();
+                updateUIState();
+                unlockGate(activeChallengeIndex);
+
+                feedbackBox.classList.add('bg-emerald-950/60', 'border-emerald-500/50', 'text-emerald-200');
+                feedbackBox.innerHTML = `
+                    <p class="font-bold text-emerald-400 mb-1">🎉 Syabas! Jawapan Tepat!</p>
+                    <p>${data.explanation}</p>
+                    <p class="mt-2 text-xs font-semibold text-amber-300">🔑 Kunci Warisan ${activeChallengeIndex + 1} diperoleh! Pintu sekatan terbuka.</p>
+                `;
+
+                document.querySelectorAll('.option-btn').forEach(btn => btn.disabled = true);
+            } else {
+                feedbackBox.classList.add('bg-rose-950/60', 'border-rose-500/50', 'text-rose-200');
+                feedbackBox.innerHTML = `
+                    <p class="font-bold text-rose-400 mb-1">❌ Jawapan Kurang Tepat.</p>
+                    <p>Sila fahami semula situasi. Peribahasa pilihan anda menggambarkan maksud yang berbeza. Boleh cuba lagi atau tekan butang Petunjuk.</p>
+                `;
+            }
+        }
+
+        function showHint() {
+            if (activeChallengeIndex < 0 || activeChallengeIndex >= 3) return;
+            hintsUsed++;
+            saveProgress();
+
+            const data = challengesData[activeChallengeIndex];
+            const feedbackBox = document.getElementById('feedback-box');
+            feedbackBox.classList.remove('hidden', 'bg-emerald-950/60', 'border-emerald-500/50', 'text-emerald-200', 'bg-rose-950/60', 'border-rose-500/50', 'text-rose-200');
+            feedbackBox.classList.add('bg-amber-950/60', 'border-amber-500/50', 'text-amber-200');
+            feedbackBox.innerHTML = `
+                <p class="font-bold text-amber-300 mb-1">💡 Petunjuk Pembelajaran:</p>
+                <p>${data.hint}</p>
+            `;
+        }
+
+        function unlockGate(index) {
+            if (gates[index]) {
+                gates[index].position.y = -5;
+                if (gateBboxIndices[index] !== -1) {
+                    walls[gateBboxIndices[index]].makeEmpty();
+                }
+            }
+        }
+
+        function saveProgress() {
+            try {
+                localStorage.setItem('arkib_warisan_keys', JSON.stringify(keysProgress));
+                localStorage.setItem('arkib_warisan_attempts', totalAttempts.toString());
+                localStorage.setItem('arkib_warisan_hints', hintsUsed.toString());
+            } catch(e) {
+                console.warn('Gagal menyimpan localStorage:', e);
+            }
+        }
+
+        function loadProgress() {
+            try {
+                const savedKeys = localStorage.getItem('arkib_warisan_keys');
+                const savedAttempts = localStorage.getItem('arkib_warisan_attempts');
+                const savedHints = localStorage.getItem('arkib_warisan_hints');
+
+                if (savedKeys) keysProgress = JSON.parse(savedKeys);
+                if (savedAttempts) totalAttempts = parseInt(savedAttempts);
+                if (savedHints) hintsUsed = parseInt(savedHints);
+
+                updateUIState();
+
+                keysProgress.forEach((hasKey, idx) => {
+                    if (hasKey) unlockGate(idx);
+                });
+            } catch(e) {
+                console.warn('Gagal membaca localStorage:', e);
+            }
+        }
+
+        function resetProgress() {
+            if (confirm("Adakah anda pasti mahu meriset semula kesemua kemajuan permainan?")) {
+                localStorage.removeItem('arkib_warisan_keys');
+                localStorage.removeItem('arkib_warisan_attempts');
+                localStorage.removeItem('arkib_warisan_hints');
+                location.reload();
+            }
+        }
+
+        function updateUIState() {
+            for (let i = 0; i < 3; i++) {
+                const el = document.getElementById(`key${i + 1}-count-text`);
+                if (el) {
+                    if (keysProgress[i]) {
+                        el.innerText = "Diperoleh ✓";
+                        el.className = "text-emerald-400 font-extrabold";
+                    } else {
+                        el.innerText = "Belum";
+                        el.className = "text-rose-400";
+                    }
+                }
+            }
+        }
+
+        function checkCollision(targetX, targetZ) {
+            const playerBox = new THREE.Box3(
+                new THREE.Vector3(targetX - PLAYER_RADIUS, 0, targetZ - PLAYER_RADIUS),
+                new THREE.Vector3(targetX + PLAYER_RADIUS, 2, targetZ + PLAYER_RADIUS)
+            );
+
+            for (let i = 0; i < walls.length; i++) {
+                if (playerBox.intersectsBox(walls[i])) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // --- 9. KAMERA THIRD-PERSON ---
+        function updateCamera() {
+            const cameraDistance = 7.0;
+            const cameraHeight = 2.5;
+
+            const offsetX = cameraDistance * Math.sin(cameraYaw) * Math.cos(cameraPitch);
+            const offsetZ = cameraDistance * Math.cos(cameraYaw) * Math.cos(cameraPitch);
+            const offsetY = cameraDistance * Math.sin(cameraPitch) + cameraHeight;
+
+            const targetCameraPos = new THREE.Vector3(
+                player.position.x + offsetX,
+                player.position.y + offsetY,
+                player.position.z + offsetZ
+            );
+
+            camera.position.lerp(targetCameraPos, 0.1);
+
+            const lookTarget = new THREE.Vector3(player.position.x, player.position.y + 1.2, player.position.z);
+            camera.lookAt(lookTarget);
+        }
+
+        // --- 10. INTERAKSI & DIALOG ---
+        function checkInteractionDistance() {
+            let foundNear = false;
+            const promptEl = document.getElementById('interaction-prompt');
+            const mobileBtn = document.getElementById('mobile-interact-btn');
+
+            interactObjects.forEach((obj) => {
+                const dist = player.position.distanceTo(obj.group.position);
+                if (dist < 3.5) {
+                    foundNear = true;
+                    activeChallengeIndex = obj.index;
+                    currentActiveObject = obj;
+                }
+            });
+
+            if (foundNear) {
+                canInteract = true;
+                promptEl.classList.remove('opacity-0', 'translate-y-4');
+                promptEl.classList.add('opacity-100', 'translate-y-0');
+
+                if (window.innerWidth < 768) {
+                    mobileBtn.classList.remove('hidden');
+                }
+            } else {
+                canInteract = false;
+                promptEl.classList.remove('opacity-100', 'translate-y-0');
+                promptEl.classList.add('opacity-0', 'translate-y-4');
+                mobileBtn.classList.add('hidden');
+            }
+        }
+
+        function triggerInteraction() {
+            if (canInteract && !isDialogOpen) {
+                openDialog();
+            }
+        }
+
+        function openDialog() {
+            isDialogOpen = true;
+            const modal = document.getElementById('dialog-modal');
+            const quizContainer = document.getElementById('quiz-container');
+            const glossaryContainer = document.getElementById('glossary-container');
+            const summaryContainer = document.getElementById('summary-container');
+            const hintBtn = document.getElementById('hint-btn');
+
+            // Buka Peti Glosari Extra (Peringkat 4)
+            if (activeChallengeIndex >= 10) {
+                quizContainer.classList.add('hidden');
+                summaryContainer.classList.add('hidden');
+                glossaryContainer.classList.remove('hidden');
+                hintBtn.classList.add('hidden');
+
+                renderGlossaryUI(activeChallengeIndex);
+            } 
+            // Buka Cabaran / Dashboard Tamat
+            else {
+                glossaryContainer.classList.add('hidden');
+                const allKeysCollected = keysProgress.every(k => k === true);
+
+                if (allKeysCollected) {
+                    quizContainer.classList.add('hidden');
+                    summaryContainer.classList.remove('hidden');
+                    hintBtn.classList.add('hidden');
+
+                    document.getElementById('summary-keys').innerText = "3 / 3";
+                    document.getElementById('summary-attempts').innerText = totalAttempts;
+                    document.getElementById('summary-hints').innerText = hintsUsed;
+                } else {
+                    quizContainer.classList.remove('hidden');
+                    summaryContainer.classList.add('hidden');
+                    hintBtn.classList.remove('hidden');
+
+                    renderQuestionUI(activeChallengeIndex);
+                }
+            }
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modal.classList.add('opacity-100', 'pointer-events-auto');
+        }
+
+        function closeDialog() {
+            isDialogOpen = false;
+            const modal = document.getElementById('dialog-modal');
+            modal.classList.remove('opacity-100', 'pointer-events-auto');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        // --- 11. ANIMASI UTAMA ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+
+            updatePlayerMovement(delta);
+            updateCamera();
+
+            checkInteractionDistance();
+
+            interactObjects.forEach((obj) => {
+                if (obj.type === "quiz") {
+                    obj.shapeMesh.rotation.y += 0.01;
+                    obj.ringMesh.scale.x = 1 + Math.sin(clock.getElapsedTime() * 3) * 0.05;
+                    obj.ringMesh.scale.y = 1 + Math.sin(clock.getElapsedTime() * 3) * 0.05;
+                } else if (obj.type === "chest") {
+                    obj.shapeMesh.rotation.x = Math.sin(clock.getElapsedTime() * 2) * 0.1;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function updatePlayerMovement(delta) {
+            if (isDialogOpen || !player) return;
+
+            let moveX = 0;
+            let moveZ = 0;
+
+            if (keys.w || keys.W || keys.ArrowUp) moveZ -= 1;
+            if (keys.s || keys.S || keys.ArrowDown) moveZ += 1;
+            if (keys.a || keys.A || keys.ArrowLeft) moveX -= 1;
+            if (keys.d || keys.D || keys.ArrowRight) moveX += 1;
+
+            if (joystickVector.x !== 0 || joystickVector.y !== 0) {
+                moveX = joystickVector.x;
+                moveZ = -joystickVector.y;
+            }
+
+            if (moveX !== 0 || moveZ !== 0) {
+                const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
+                if (length > 1) {
+                    moveX /= length;
+                    moveZ /= length;
+                }
+
+                const sinYaw = Math.sin(cameraYaw);
+                const cosYaw = Math.cos(cameraYaw);
+
+                const dirX = moveX * cosYaw + moveZ * sinYaw;
+                const dirZ = -moveX * sinYaw + moveZ * cosYaw;
+
+                const nextX = player.position.x + dirX * PLAYER_SPEED * delta;
+                const nextZ = player.position.z + dirZ * PLAYER_SPEED * delta;
+
+                if (!checkCollision(nextX, player.position.z)) {
+                    player.position.x = nextX;
+                }
+                if (!checkCollision(player.position.x, nextZ)) {
+                    player.position.z = nextZ;
+                }
+
+                const targetAngle = Math.atan2(dirX, dirZ);
+                player.rotation.y = targetAngle;
+            }
+        }
+
+        window.onload = () => {
+            init();
+        };
+    </script>
+</body>
+</html>
